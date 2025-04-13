@@ -11,22 +11,14 @@ const userDetails = async (req, res) => {
     res.json(users); // Sends the user data as JSON response
   } catch (error) {
     console.error("Error fetching users:", error); // Logs error to the console
-    res.status(500).json({ message: "Error fetching users", error: error.message }); // Sends a proper error response with status code
+    res
+      .status(500)
+      .json({ message: "Error fetching users", error: error.message }); // Sends a proper error response with status code
   }
 };
 
-
 const addUser = async (req, res) => {
-  const {
-    first_name,
-    last_name,
-    email,
-    password,
-    phone,
-    role,
-    status,
-    profile_picture,
-  } = req.body;
+  const { username, email, password, phone, role, status } = req.body;
 
   try {
     const existingUser = await User.findOne({ where: { email } });
@@ -36,14 +28,12 @@ const addUser = async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(password, 10); // Hash the password
     const newUser = await User.create({
-      first_name,
-      last_name,
+      username,
       email,
       password: hashedPassword,
       phone,
       role,
       status,
-      profile_picture,
     });
 
     res.status(201).json(newUser);
@@ -53,4 +43,26 @@ const addUser = async (req, res) => {
   }
 };
 
-module.exports = { userDetails, addUser };
+const LoginUser = async (req, res) => {
+  const { email, password } = req.body;
+
+  try {
+    const user = await User.findOne({ where: { email } });
+
+    if (!user) {
+      return res.status(400).json({ message: "User not found" });
+    }
+
+    const match = await bcrypt.compare(password, user.password);
+    if (!match) {
+      return res.status(400).json({ message: "Invalid password" });
+    }
+
+    res.status(200).json({ message: "Login successful" });
+  } catch (error) {
+    console.error("Error logging in:", error);
+    res.status(500).json({ message: "Error logging in" });
+  }
+};
+
+module.exports = { userDetails, addUser, LoginUser };

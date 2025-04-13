@@ -10,7 +10,11 @@ const RepaymentSchedule = require("./models/RepaymentSchedule");
 const TransactionHistory = require("./models/TransactionHistory");
 const { transactionDbHistories } = require("./controllers/historiesController");
 const { loanDetails } = require("./controllers/loanDetailsController");
-const { userDetails, addUser } = require("./controllers/usersController");
+const {
+  userDetails,
+  addUser,
+  LoginUser,
+} = require("./controllers/usersController");
 
 const app = express();
 app.use(cors());
@@ -30,14 +34,62 @@ app.get("/api", (req, res) => {
 // User Routes
 app.get("/users", userDetails);
 
+app.get("/users/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = parseInt(id, 10);
+
+    if (isNaN(userId)) {
+      return res.status(400).json({ message: "Invalid user ID format" });
+    }
+
+    const user = await User.findOne({ where: { user_id: userId } });
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.status(200).json(user);
+  } catch (error) {
+    console.error("Error fetching user:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
 app.put("/users/:id", async (req, res) => {
-  const { id } = req.params;
-  const { first_name, last_name, email, phone } = req.body;
-  const user = await User.update(
-    { first_name, last_name, email, phone },
-    { where: { user_id: id } }
-  );
-  res.json(user);
+  try {
+    const { id } = req.params;
+    const { username, email, phone, password, role, status } = req.body;
+
+    console.log("User update request received for ID:", id);
+    console.log("Received Data:", req.body);
+
+    const userId = parseInt(id, 10);
+    if (isNaN(userId)) {
+      return res.status(400).json({ message: "Invalid user ID format" });
+    }
+
+    const [updated] = await User.update(
+      { username, email, phone, password, role, status },
+      { where: { user_id: userId } }
+    );
+
+    console.log("Rows updated:", updated);
+
+    if (updated > 0) {
+      const updatedUser = await User.findOne({ where: { user_id: userId } });
+      return res
+        .status(200)
+        .json({ message: "User updated successfully", user: updatedUser });
+    } else {
+      return res
+        .status(404)
+        .json({ message: "User not found or no changes made" });
+    }
+  } catch (error) {
+    console.error("Error updating user:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
 });
 
 app.delete("/users/:id", async (req, res) => {
@@ -50,27 +102,7 @@ app.delete("/users/:id", async (req, res) => {
 app.post("/register", addUser);
 
 // POST request to login a user
-app.post("/login", async (req, res) => {
-  const { email, password } = req.body;
-
-  try {
-    const user = await User.findOne({ where: { email } });
-
-    if (!user) {
-      return res.status(400).json({ message: "User not found" });
-    }
-
-    const match = await bcrypt.compare(password, user.password);
-    if (!match) {
-      return res.status(400).json({ message: "Invalid password" });
-    }
-
-    res.status(200).json({ message: "Login successful" });
-  } catch (error) {
-    console.error("Error logging in:", error);
-    res.status(500).json({ message: "Error logging in" });
-  }
-});
+app.post("/login", LoginUser);
 
 // Loan Amount Routes
 app.get("/loan-amounts", async (req, res) => {
